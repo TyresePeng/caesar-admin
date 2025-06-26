@@ -16,3 +16,4 @@ dist-ssr
 
 package-lock.json
 stats.html
+playwright-browsers
