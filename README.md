@@ -92,12 +92,32 @@ graph TD
 - **AI 回复模拟**（功能预留，暂未实现）
 - **录制控制**：支持开始/停止录制直播视频，自动保存为 MP4
 ---
+## 🚀 快速安装（适用于普通用户）
 
-## 🚀 快速启动
+如果你只是想**快速使用桌面应用**，无需环境配置，直接下载安装即可：
+
+### 🖥️ macOS 安装包（Apple 芯片M1/M2/M3）
+
+🔗 [点击下载 caesar-media-1.0.0-arm64.dmg](https://github.com/TyresePeng/caesar-admin/releases/download/v1.0.0/caesar-media-1.0.0-arm64.dmg)
+
+- 支持 macOS Apple Silicon (M1/M2/M3) 系列
+- 下载后双击安装即可使用
+
+---
+
+## ✅ 开发者模式启动（适用于开发调试）
+
+如果你是开发者，可以通过以下命令运行开发环境：
 
 ```bash
 # 克隆项目
-git clone https://github.com/yourname/caesar-admin.git
+git clone https://github.com/TyresePeng/caesar-admin.git
+
+# 进入项目目录
+cd caesar-admin
+
+#安装playwright环境
+npx playwright install
 
 # 安装 pnpm（如未安装）
 npm install -g pnpm
@@ -110,8 +130,6 @@ pnpm dev
 
 # 启动 Electron 桌面应用（开发模式）
 pnpm electron:dev
-```
-
 ---
 
 ## 📦 打包与工程规范
@@ -121,7 +139,7 @@ pnpm electron:dev
 ### 🛠️ 打包桌面应用
 
 ```bash
-# 安装 playwright 应用
+# 安装 playwright 环境
 PLAYWRIGHT_BROWSERS_PATH=0 npx playwright install
 # 使用 Electron Builder 打包桌面应用（支持 Mac/Windows/Linux）
 pnpm electron:build
