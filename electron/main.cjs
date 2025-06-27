@@ -1,8 +1,22 @@
-const { app, BrowserWindow, ipcMain, dialog } = require("electron");
 const path = require("path");
+process.env.PLAYWRIGHT_BROWSERS_PATH = path.join(
+  process.resourcesPath,
+  "playwright-browsers"
+);
+const { app, BrowserWindow, ipcMain, dialog } = require("electron");
 const fs = require("fs");
 const waitOn = require("wait-on");
-const { chromium } = require("playwright");
+
+let chromium;
+try {
+  chromium = require("playwright").chromium;
+} catch (err) {
+  console.error("❌ Playwright 加载失败：", err);
+  const { dialog, app } = require("electron");
+  dialog.showErrorBox("依赖错误", "Playwright 加载失败，请检查依赖或打包配置");
+  app.quit();
+}
+
 const dotenv = require("dotenv");
 const ROOT = process.cwd(); // or use path.join(__dirname, "../")
 const NODE_ENV = process.env.NODE_ENV || "development";
@@ -11,7 +25,7 @@ dotenv.config({ path: envPath });
 const userDataDir = app.getPath("userData");
 const storageStateName = "test.storageState.json";
 const storageStatePath = path.join(userDataDir, storageStateName);
-
+const isDev = NODE_ENV === "development";
 let mainWindow;
 let browser = null; // 用于保存 Chromium 浏览器实例
 let browserContext = null; // 用于保存上下文（已有的你应该已经有了）
@@ -26,8 +40,10 @@ async function createWindow() {
       nodeIntegration: false,
     },
   });
-
-  if (NODE_ENV) {
+  console.log("✅ NODE_ENV ", NODE_ENV);
+  console.log("✅ isDev ", isDev);
+  console.log("✅ app.isPackaged ", app.isPackaged);
+  if (!app.isPackaged) {
     const devServerUrl = `http://localhost:${process.env.VITE_APP_PORT}`;
     try {
       console.log(`⏳ 等待${devServerUrl} Vite 服务启动...`);

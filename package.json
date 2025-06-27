@@ -57,6 +57,7 @@
     "animate.css": "^4.1.1",
     "axios": "^1.7.2",
     "color": "^4.2.3",
+    "dotenv": "^16.6.0",
     "echarts": "^5.5.0",
     "element-plus": "^2.7.5",
     "exceljs": "^4.4.0",
@@ -149,8 +150,7 @@
       "output": "dist_app"
     },
     "mac": {
-      "target": "dmg",
-      "icon": "build/icon.png"
+      "target": "dmg"
     },
     "win": {
       "target": "nsis"
@@ -158,9 +158,12 @@
     "linux": {
       "target": "AppImage"
     },
+    "asarUnpack": [
+      "node_modules/.pnpm/playwright-core@1.52.0/node_modules/**"
+    ],
     "extraResources": [
       {
-        "from": "playwright-browsers",
+        "from": "node_modules/.pnpm/playwright-core@1.52.0/node_modules/playwright-core/.local-browsers",
         "to": "playwright-browsers"
       }
     ]
