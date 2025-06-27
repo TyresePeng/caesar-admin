@@ -121,6 +121,8 @@ pnpm electron:dev
 ### 🛠️ 打包桌面应用
 
 ```bash
+# 安装 playwright 应用
+PLAYWRIGHT_BROWSERS_PATH=0 npx playwright install
 # 使用 Electron Builder 打包桌面应用（支持 Mac/Windows/Linux）
 pnpm electron:build
 ```
