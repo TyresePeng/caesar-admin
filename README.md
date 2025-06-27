@@ -51,7 +51,7 @@ graph TD
   - 多任务调度与爬取：支持短视频内容抓取
   - 弹幕监控：接入直播间弹幕与录制控制
   - 工程规范完善：Git 提交、代码格式、类型校验等全流程支持
-  - 服务端地址：[GitHub](https://github.com/TyresePeng/caesar)
+  - 服务端地址：[caesar](https://github.com/TyresePeng/caesar)
 
 
 ---
@@ -104,7 +104,7 @@ graph TD
 - 支持 macOS Apple Silicon (M1/M2/M3) 系列
 - 下载后双击安装即可使用
 ### ⚠️ 安装后需确保后端服务已启动，否则部分功能将不可用
-- 服务端地址：[GitHub](https://github.com/TyresePeng/caesar)
+- 服务端地址：[caesar](https://github.com/TyresePeng/caesar)
 ---
 
 ## ✅ 开发者模式启动（适用于开发调试）
