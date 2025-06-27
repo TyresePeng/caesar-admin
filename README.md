@@ -66,7 +66,6 @@ graph TD
 | HTTP 请求  | Axios                    | ^1.7.2      |
 | 桌面应用   | Electron                 | ^36.3.2     |
 | 打包工具   | Electron Builder         | ^26.0.12    |
-| 自动化工具 | Husky + Lint Staged 等   | ✅          |
 | 爬虫框架   | Playwright（Node 支持） | 自定义集成 |
 
 ---
