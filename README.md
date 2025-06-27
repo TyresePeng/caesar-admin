@@ -192,3 +192,18 @@ pnpm electron:build
 > **开发者**：Tyrese
 > **邮箱**：tyrese.guo@gmail.com
 > **项目地址**：[GitHub](https://github.com/TyresePeng/caesar-admin)
+
+### 🧑‍💻 微信交流群
+扫码添加开发者微信，备注 “Caesar”，邀请进交流群 👇
+<table>
+  <tr>
+    <td style="text-align:center;">
+      <img src="https://github.com/TyresePeng/caesar/blob/main/docs/chat.png" width="180"/><br/>
+      <strong>微信群二维码</strong>
+    </td>
+    <td style="text-align:center; padding-left: 20px;">
+      <img src="https://github.com/TyresePeng/caesar/blob/main/docs/chat_tyrese.png" width="180"/><br/>
+      <strong>作者微信</strong>
+    </td>
+  </tr>
+</table>
