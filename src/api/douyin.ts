@@ -3,7 +3,7 @@ import { UnwrapRef } from "vue";
 
 import.meta.env;
 
-const PLATFORM_BASE_URL = import.meta.env.VITE_APP_API_URL + "/douyin/";
+const PLATFORM_BASE_URL = import.meta.env.VITE_APP_API_URL + "/douyin";
 
 class douyinApi {
   /**
