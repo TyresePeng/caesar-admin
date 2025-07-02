@@ -2,90 +2,139 @@
   <div class="app-container live-monitor" v-loading="loading">
     <!-- 直播间控制区 -->
     <el-card shadow="never">
-      <el-form
-        label-width="100px"
-        :inline="true"
-        size="small"
-        style="align-items: center"
-      >
-        <el-form-item
-          label="直播间地址"
-          style="display: flex; align-items: center"
-        >
-          <el-input
-            v-model="roomInput"
-            placeholder="请输入直播间链接或ID"
-            style="width: 400px"
-            :disabled="isRoomLoaded"
-          />
-          <el-button
-            type="primary"
-            @click="loadRoom"
-            :disabled="isRoomLoaded"
-            style="margin-left: 8px"
+      <el-row :gutter="20" align="top">
+        <!-- 左侧：直播间控制表单 -->
+        <el-col :span="16">
+          <el-form label-width="100px" :inline="true" size="small">
+            <el-form-item label="直播间地址">
+              <el-input
+                v-model="roomInput"
+                placeholder="请输入直播间链接或ID"
+                style="width: 400px"
+                :disabled="isRoomLoaded"
+              />
+              <el-button
+                type="primary"
+                @click="loadRoom"
+                :disabled="isRoomLoaded"
+                style="margin-left: 8px"
+              >
+                加载直播间
+              </el-button>
+              <el-button
+                v-if="isRoomLoaded"
+                type="warning"
+                @click="modifyRoom"
+                style="margin-left: 8px"
+              >
+                修改直播间
+              </el-button>
+            </el-form-item>
+          </el-form>
+
+          <el-form label-width="100px" style="margin-top: 10px" size="small">
+            <el-form-item label="直播间描述">
+              <el-input
+                type="textarea"
+                v-model="roomDescription"
+                placeholder="请输入直播间描述，AI回复将参考此内容"
+                :rows="3"
+                style="width: 600px"
+                maxlength="300"
+                show-word-limit
+                :disabled="isRoomLoaded"
+              />
+            </el-form-item>
+
+            <el-form-item label="控制操作">
+              <el-button
+                type="success"
+                @click="startMonitor"
+                :disabled="!isRoomLoaded || isMonitoring"
+              >
+                开始监听弹幕
+              </el-button>
+              <el-button
+                type="warning"
+                @click="stopMonitor"
+                :disabled="!isMonitoring"
+              >
+                停止监听弹幕
+              </el-button>
+            </el-form-item>
+          </el-form>
+        </el-col>
+
+        <!-- 右侧：直播间信息展示 -->
+        <el-col :span="8">
+          <div
+            style="
+              padding: 12px 16px;
+              border-left: 1px solid #eee;
+              min-height: 160px;
+            "
           >
-            加载直播间
-          </el-button>
-          <el-button
-            v-if="isRoomLoaded"
-            type="warning"
-            @click="modifyRoom"
-            style="margin-left: 8px"
-          >
-            修改直播间
-          </el-button>
-        </el-form-item>
-      </el-form>
+            <div
+              style="font-weight: bold; font-size: 16px; margin-bottom: 10px"
+            >
+              📺 直播间信息
+            </div>
+            <p><strong>标题：</strong>{{ roomTitle || "未获取" }}</p>
+            <p>
+              <strong>直播间状态：</strong>
+              <el-tag
+                size="small"
+                :type="roomStatus === 'LIVING' ? 'success' : 'info'"
+              >
+                {{ roomStatus === "LIVING" ? "直播中" : "未直播" }}
+              </el-tag>
+            </p>
 
-      <el-form label-width="100px" style="margin-top: 10px" size="small">
-        <el-form-item label="直播间描述">
-          <el-input
-            type="textarea"
-            v-model="roomDescription"
-            placeholder="请输入直播间描述，AI回复将参考此内容"
-            :rows="3"
-            style="width: 600px"
-            maxlength="300"
-            show-word-limit
-            :disabled="isRoomLoaded"
-          />
-        </el-form-item>
+            <div v-if="Object.keys(streamUrls).length">
+              <el-form label-width="80px" size="small">
+                <el-form-item label="清晰度">
+                  <el-select v-model="selectedQuality" placeholder="选择清晰度">
+                    <el-option
+                      v-for="(url, quality) in streamUrls"
+                      :key="quality"
+                      :label="quality"
+                      :value="quality"
+                    />
+                  </el-select>
+                </el-form-item>
 
-        <!-- 控制按钮统一放最后一行 -->
-        <el-form-item label="控制操作">
-          <el-button
-            type="success"
-            @click="startMonitor"
-            :disabled="!isRoomLoaded || isMonitoring"
-          >
-            开始监听弹幕
-          </el-button>
-
-          <el-button
-            type="warning"
-            @click="stopMonitor"
-            :disabled="!isMonitoring"
-          >
-            停止监听弹幕
-          </el-button>
-
-          <el-button
-            type="success"
-            @click="startRecord"
-            :disabled="!isRoomLoaded || isRecording"
-          >
-            <el-icon><VideoCameraFilled /></el-icon> 开始录制
-          </el-button>
-
-          <el-button type="danger" @click="stopRecord" :disabled="!isRecording">
-            <el-icon><VideoPause /></el-icon> 停止录制
-          </el-button>
-        </el-form-item>
-      </el-form>
-
-      <el-tag v-if="recordingUrl" type="info" style="margin-top: 10px">
-        录制完成：<a :href="recordingUrl" target="_blank">点击下载</a>
-      </el-tag>
+                <el-form-item label="操作">
+                  <el-button
+                    type="success"
+                    size="small"
+                    :disabled="isRecordingMap[selectedQuality]"
+                    @click="startRecord(selectedQuality)"
+                  >
+                    <el-icon><VideoCameraFilled /></el-icon> 录制
+                  </el-button>
+                  <el-button
+                    type="danger"
+                    size="small"
+                    :disabled="!isRecordingMap[selectedQuality]"
+                    @click="stopRecord(selectedQuality)"
+                    style="margin-left: 8px"
+                  >
+                    <el-icon><VideoPause /></el-icon> 停止
+                  </el-button>
+                  <el-button
+                    type="info"
+                    size="small"
+                    style="margin-left: 8px"
+                    @click="copyStreamUrl"
+                  >
+                    复制流地址
+                  </el-button>
+                </el-form-item>
+              </el-form>
+            </div>
+          </div>
+        </el-col>
+      </el-row>
     </el-card>
 
     <!-- AI 弹幕回复配置区 -->
@@ -193,9 +242,64 @@ const selectedUsers = ref<string[]>([...userPool.value]);
 const newBlockedWord = ref("");
 const blockedWords = ref<string[]>([]);
 const danmakuContainer = ref<HTMLElement | null>(null);
+const roomTitle = ref("");
+const roomStatus = ref("");
+
+const streamUrls = ref<Record<string, string>>({});
+const isRecordingMap = ref<Record<string, boolean>>({});
+const selectedQuality = ref(""); // 当前选择的清晰度
 
 let roundRobinIndex = 0;
 let idCounter = 0;
+
+const copyStreamUrl = () => {
+  const url = streamUrls.value[selectedQuality.value];
+  if (!url) {
+    ElMessage.warning("请选择清晰度");
+    return;
+  }
+
+  // 检查 clipboard API 是否可用
+  if (
+    typeof navigator !== "undefined" &&
+    navigator.clipboard &&
+    window.isSecureContext
+  ) {
+    navigator.clipboard
+      .writeText(url)
+      .then(() => {
+        ElMessage.success("流地址已复制到剪贴板");
+      })
+      .catch(() => {
+        ElMessage.error("复制失败");
+      });
+  } else {
+    // fallback
+    fallbackCopy(url);
+  }
+};
+
+function fallbackCopy(text: string) {
+  const textArea = document.createElement("textarea");
+  textArea.value = text;
+  textArea.style.position = "fixed";
+  textArea.style.left = "-9999px";
+  document.body.appendChild(textArea);
+  textArea.focus();
+  textArea.select();
+  try {
+    const success = document.execCommand("copy");
+    if (success) {
+      ElMessage.success("已复制");
+    } else {
+      ElMessage.error("复制失败");
+    }
+  } catch (err) {
+    ElMessage.error("复制失败");
+  } finally {
+    document.body.removeChild(textArea);
+  }
+}
 
 const serviceUrl = import.meta.env.VITE_APP_API_URL;
 const { connect, subscribe, disconnect } = useStompClient(`${serviceUrl}/ws`, {
@@ -203,24 +307,55 @@ const { connect, subscribe, disconnect } = useStompClient(`${serviceUrl}/ws`, {
 });
 
 const loadRoom = () => {
-  if (!roomInput.value.trim()) {
+  loading.value = true;
+  let roomId = roomInput.value.trim();
+
+  if (!roomId) {
     ElMessage.warning("请输入直播间地址或 ID");
     return;
   }
-  isRoomLoaded.value = true;
-  ElMessage.success("直播间加载成功");
+  douyinApi
+    .queryRoom(roomId)
+    .then((res) => {
+      console.log(res);
+      roomTitle.value = res.roomTitle;
+      roomStatus.value = res.roomStatus;
+      let hls_pull_url_map =
+        res.roomInfoJsonNode.web_stream_url.hls_pull_url_map;
+      // 初始化 streamUrls
+      streamUrls.value = {
+        FULL_HD1: hls_pull_url_map.FULL_HD1,
+        HD1: hls_pull_url_map.HD1,
+        SD1: hls_pull_url_map.SD1,
+        SD2: hls_pull_url_map.SD2,
+      };
+      isRecordingMap.value = Object.keys(streamUrls.value).reduce(
+        (acc, key) => {
+          acc[key] = false;
+          return acc;
+        },
+        {} as Record<string, boolean>
+      );
+      isRoomLoaded.value = true;
+      ElMessage.success("直播间加载成功");
+    })
+    .finally(() => {
+      loading.value = false;
+    });
 };
 
 const modifyRoom = async () => {
   loading.value = true;
   if (isRecording.value) {
-    await stopRecord();
+    await stopRecord(selectedQuality.value);
   }
   if (isMonitoring.value) {
     stopMonitor();
   }
   loading.value = false;
   isRoomLoaded.value = false;
+  roomTitle.value = "";
+  roomStatus.value = "";
   ElMessage.info("直播间修改已启用，请重新输入直播间地址");
 };
 
@@ -260,54 +395,42 @@ const stopMonitor = () => {
   ElMessage.info("停止监听弹幕");
 };
 
-const startRecord = async () => {
-  loading.value = true;
-  if (!isRoomLoaded.value) {
-    ElMessage.warning("请先加载直播间");
-    return;
-  }
-  if (isRecording.value) return;
+const startRecord = async (quality: string) => {
+  const roomId = roomInput.value;
+  const url = streamUrls.value[quality];
+  if (!url) return ElMessage.warning("无效流地址");
   try {
-    await douyinApi.liveRecord(roomInput.value.trim());
-    isRecording.value = true;
-    recordingUrl.value = "";
-    ElMessage.success("开始录制");
+    loading.value = true;
+    await douyinApi.liveRecord(roomId, url, quality);
+    isRecordingMap.value[quality] = true;
+    ElMessage.success(`${quality} 开始录制`);
   } catch {
-    ElMessage.error("录制失败");
+    ElMessage.error(`${quality} 录制失败`);
   } finally {
     loading.value = false;
   }
 };
 
-const stopRecord = async () => {
-  if (!isRecording.value) {
-    return ElMessage.info("录制未开始");
-  }
-
-  const roomId = roomInput.value.trim();
+const stopRecord = async (quality: string) => {
   try {
+    const roomId = roomInput.value;
+    const streamUrl = streamUrls.value[quality];
     loading.value = true;
-    // 1. 停止录制（可以是 POST/GET，看你接口）
-    await douyinApi.stopLiveRecord(roomId);
-
-    // 2. 下载录制文件，注意 responseType 必须是 blob
-    const res = await douyinApi.downloadRecording(roomId);
-    // 3. 构建 Blob 并下载
+    await douyinApi.stopLiveRecord(roomId, streamUrl, quality);
+    const res = await douyinApi.downloadRecording(roomId, streamUrl, quality);
     const blob = new Blob([res.data], { type: "video/mp4" });
-    const url = window.URL.createObjectURL(blob);
+    const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `${roomId}_${Date.now()}.mp4`;
+    a.download = `${roomId}_${quality}_${Date.now()}.mp4`;
     a.click();
-    window.URL.revokeObjectURL(url);
+    URL.revokeObjectURL(url);
     a.remove();
-
-    // 4. 状态变更
-    isRecording.value = false;
-    ElMessage.success("录制文件已下载");
-  } catch (err) {
-    console.error("停止录制失败", err);
-    ElMessage.error("停止录制失败");
+    isRecordingMap.value[quality] = false;
+    ElMessage.success(`${quality} 已下载`);
+  } catch (e) {
+    console.error(e);
+    ElMessage.error(`${quality} 停止失败`);
   } finally {
     loading.value = false;
   }

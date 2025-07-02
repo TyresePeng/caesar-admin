@@ -43,10 +43,15 @@ class douyinApi {
    *
    * @param roomId 房间号
    */
-  static liveRecord(roomId: string) {
+  static liveRecord(roomId: string, streamUrl: string, quality: string) {
     return request<any, any>({
       url: `${PLATFORM_BASE_URL}/live-record?roomId=${roomId}`,
-      method: "GET",
+      method: "POST",
+      data: {
+        roomId,
+        streamUrl,
+        quality,
+      },
     });
   }
 
@@ -55,10 +60,15 @@ class douyinApi {
    *
    * @param roomId 房间号
    */
-  static stopLiveRecord(roomId: string) {
+  static stopLiveRecord(roomId: string, streamUrl: string, quality: string) {
     return request<any, any>({
-      url: `${PLATFORM_BASE_URL}/stop-live-record?roomId=${roomId}`,
-      method: "GET",
+      url: `${PLATFORM_BASE_URL}/stop-live-record`,
+      method: "POST",
+      data: {
+        roomId,
+        streamUrl,
+        quality,
+      },
     });
   }
 
@@ -79,10 +89,15 @@ class douyinApi {
    *
    * @param roomId 房间号
    */
-  static downloadRecording(roomId: string) {
+  static downloadRecording(roomId: string, streamUrl: string, quality: string) {
     return request<any, any>({
-      url: `${PLATFORM_BASE_URL}/record/download/${roomId}`,
-      method: "GET",
+      url: `${PLATFORM_BASE_URL}/record/download`,
+      method: "POST",
+      data: {
+        roomId,
+        streamUrl,
+        quality,
+      },
       responseType: "blob",
     });
   }
