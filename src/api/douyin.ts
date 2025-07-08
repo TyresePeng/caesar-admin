@@ -101,5 +101,24 @@ class douyinApi {
       responseType: "blob",
     });
   }
+
+  /**
+   * 发送消息
+   *
+   * @param roomId 房间号
+   * @param userId 用户ID
+   * @param msg 信息
+   */
+  static sendMsg(roomId: string, userId: string, msg: string) {
+    return request<any, any>({
+      url: `${PLATFORM_BASE_URL}/send-msg`,
+      method: "POST",
+      data: {
+        roomId,
+        userId,
+        msg,
+      },
+    });
+  }
 }
 export default douyinApi;
