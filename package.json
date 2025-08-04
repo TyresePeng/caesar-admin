@@ -61,6 +61,7 @@
     "echarts": "^5.5.0",
     "element-plus": "^2.7.5",
     "exceljs": "^4.4.0",
+    "hls.js": "^1.6.7",
     "lodash-es": "^4.17.21",
     "net": "^1.0.2",
     "nprogress": "^0.2.0",
