@@ -24,7 +24,7 @@
     <div v-if="hasStreams" class="stream-control-section">
       <el-row :gutter="12">
         <el-col :span="12">
-          <el-form-item label="清晰度" label-width="61px" size="small">
+          <el-form-item label="清晰度" label-width="60px" size="small">
             <el-select
               :model-value="selectedQuality"
               placeholder="选择清晰度"
