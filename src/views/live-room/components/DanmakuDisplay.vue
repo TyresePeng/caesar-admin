@@ -152,13 +152,15 @@ const scrollToBottom = () => {
   if (danmakuContainer.value) {
     const container = danmakuContainer.value;
     // 检查用户是否正在查看历史弹幕（不在底部）
-    const isAtBottom = container.scrollTop + container.clientHeight >= container.scrollHeight - 10;
-    
+    const isAtBottom =
+      container.scrollTop + container.clientHeight >=
+      container.scrollHeight - 10;
+
     // 只有当用户在底部时才自动滚动，避免打断用户查看历史弹幕
     if (isAtBottom) {
       container.scrollTo({
         top: container.scrollHeight,
-        behavior: 'smooth'
+        behavior: "smooth",
       });
     }
   }
