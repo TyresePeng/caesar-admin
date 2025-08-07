@@ -42,9 +42,7 @@
           show-word-limit
           @keyup.enter="handleSubmit"
         />
-        <div class="input-tip">
-          如果不设置，将使用房间ID作为显示名称
-        </div>
+        <div class="input-tip">如果不设置，将使用房间ID作为显示名称</div>
       </el-form-item>
 
       <el-form-item label="快速添加">
@@ -72,11 +70,7 @@
     <template #footer>
       <div class="dialog-footer">
         <el-button @click="onClose">取消</el-button>
-        <el-button
-          type="primary"
-          :loading="loading"
-          @click="handleSubmit"
-        >
+        <el-button type="primary" :loading="loading" @click="handleSubmit">
           添加直播间
         </el-button>
       </div>
@@ -188,7 +182,7 @@ const historyDialogVisible = ref(false);
 
 const formData = ref<FormData>({
   roomInput: "",
-  displayName: ""
+  displayName: "",
 });
 
 const presetRooms = ref<PresetRoom[]>([
@@ -196,14 +190,14 @@ const presetRooms = ref<PresetRoom[]>([
     id: "1",
     roomInput: "123456789",
     displayName: "测试直播间1",
-    tags: ["测试", "开发"]
+    tags: ["测试", "开发"],
   },
   {
-    id: "2", 
+    id: "2",
     roomInput: "https://live.douyin.com/987654321",
     displayName: "测试直播间2",
-    tags: ["测试", "演示"]
-  }
+    tags: ["测试", "演示"],
+  },
 ]);
 
 const historyRooms = ref<HistoryRoom[]>([]);
@@ -211,18 +205,18 @@ const historyRooms = ref<HistoryRoom[]>([]);
 // ========== 计算属性 ==========
 const dialogVisible = computed({
   get: () => props.visible,
-  set: (val) => emit("update:visible", val)
+  set: (val) => emit("update:visible", val),
 });
 
 // ========== 表单验证规则 ==========
 const formRules: FormRules = {
   roomInput: [
     { required: true, message: "请输入直播间地址或房间ID", trigger: "blur" },
-    { 
+    {
       validator: (rule, value, callback) => {
         const roomIdPattern = /^\d+$/;
         const urlPattern = /^https:\/\/live\.douyin\.com\/\d+/;
-        
+
         if (!value) {
           callback(new Error("请输入直播间地址或房间ID"));
         } else if (!roomIdPattern.test(value) && !urlPattern.test(value)) {
@@ -230,13 +224,13 @@ const formRules: FormRules = {
         } else {
           callback();
         }
-      }, 
-      trigger: "blur" 
-    }
+      },
+      trigger: "blur",
+    },
   ],
   displayName: [
-    { max: 50, message: "显示名称不能超过50个字符", trigger: "blur" }
-  ]
+    { max: 50, message: "显示名称不能超过50个字符", trigger: "blur" },
+  ],
 };
 
 // ========== 方法 ==========
@@ -255,7 +249,7 @@ const onClose = () => {
 const resetForm = () => {
   formData.value = {
     roomInput: "",
-    displayName: ""
+    displayName: "",
   };
   formRef.value?.clearValidate();
 };
@@ -285,13 +279,13 @@ const handleSubmit = async () => {
     saveToHistory({
       roomInput: formData.value.roomInput,
       displayName: displayName,
-      lastUsed: Date.now()
+      lastUsed: Date.now(),
     });
 
     // 发送添加事件
     emit("room-added", {
       roomInput: formData.value.roomInput,
-      displayName: displayName
+      displayName: displayName,
     });
 
     onClose();
@@ -361,24 +355,26 @@ const formatTime = (timestamp: number): string => {
 const saveToHistory = (room: HistoryRoom) => {
   try {
     const history = loadHistory();
-    
+
     // 移除已存在的记录
-    const existingIndex = history.findIndex(h => h.roomInput === room.roomInput);
+    const existingIndex = history.findIndex(
+      (h) => h.roomInput === room.roomInput
+    );
     if (existingIndex > -1) {
       history.splice(existingIndex, 1);
     }
-    
+
     // 添加到开头
     history.unshift(room);
-    
+
     // 只保留最近20条记录
     if (history.length > 20) {
       history.splice(20);
     }
-    
-    localStorage.setItem('live-room-history', JSON.stringify(history));
+
+    localStorage.setItem("live-room-history", JSON.stringify(history));
   } catch (error) {
-    console.error('保存历史记录失败:', error);
+    console.error("保存历史记录失败:", error);
   }
 };
 
@@ -387,26 +383,29 @@ const saveToHistory = (room: HistoryRoom) => {
  */
 const loadHistory = (): HistoryRoom[] => {
   try {
-    const saved = localStorage.getItem('live-room-history');
+    const saved = localStorage.getItem("live-room-history");
     if (saved) {
       const history = JSON.parse(saved);
       historyRooms.value = Array.isArray(history) ? history : [];
       return historyRooms.value;
     }
   } catch (error) {
-    console.error('加载历史记录失败:', error);
+    console.error("加载历史记录失败:", error);
   }
-  
+
   historyRooms.value = [];
   return historyRooms.value;
 };
 
 // ========== 监听器 ==========
-watch(() => props.visible, (visible) => {
-  if (visible) {
-    loadHistory();
+watch(
+  () => props.visible,
+  (visible) => {
+    if (visible) {
+      loadHistory();
+    }
   }
-});
+);
 
 // ========== 生命周期 ==========
 onMounted(() => {

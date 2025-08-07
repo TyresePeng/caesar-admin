@@ -121,7 +121,10 @@ const props = defineProps<{
 const emit = defineEmits<{
   "room-updated": [roomId: string, data: Partial<LiveRoomData>];
   "monitoring-changed": [roomId: string, isMonitoring: boolean];
-  "danmaku-received": [roomId: string, danmaku: { id: number; user: string; content: string }];
+  "danmaku-received": [
+    roomId: string,
+    danmaku: { id: number; user: string; content: string },
+  ];
 }>();
 
 // ========== 内部状态管理 ==========
@@ -166,16 +169,24 @@ const { connect, subscribe, disconnect } = useStompClient(`${serviceUrl}/ws`, {
 });
 
 // ========== 监听 props 变化 ==========
-watch(() => props.roomData, (newData) => {
-  Object.assign(internalRoomData, newData);
-}, { deep: true });
+watch(
+  () => props.roomData,
+  (newData) => {
+    Object.assign(internalRoomData, newData);
+  },
+  { deep: true }
+);
 
 // ========== 监听批量操作事件 ==========
 const handleBatchOperation = (event: CustomEvent) => {
   const { action } = event.detail;
-  if (action === 'start' && internalRoomData.isLoaded && !internalRoomData.isMonitoring) {
+  if (
+    action === "start" &&
+    internalRoomData.isLoaded &&
+    !internalRoomData.isMonitoring
+  ) {
     startMonitor();
-  } else if (action === 'stop' && internalRoomData.isMonitoring) {
+  } else if (action === "stop" && internalRoomData.isMonitoring) {
     stopMonitor();
   }
 };
@@ -216,24 +227,25 @@ function sendMyDanmaku() {
 function isDuplicateDanmaku(user: string, content: string): boolean {
   const now = Date.now();
   const hash = `${user.trim()}_${content.trim()}`;
-  
+
   console.log(`🔍 检查重复弹幕: ${hash}, 缓存大小: ${recentDanmakus.size}`);
-  
+
   // 检查是否在最近3秒内有相同的弹幕
   if (recentDanmakus.has(hash)) {
     const lastTime = recentDanmakus.get(hash)!;
     const timeDiff = now - lastTime;
     console.log(`⏰ 发现缓存弹幕，时间差: ${timeDiff}ms`);
-    if (timeDiff < 3000) { // 3秒内的重复弹幕过滤
+    if (timeDiff < 3000) {
+      // 3秒内的重复弹幕过滤
       console.log(`🚫 过滤3秒内重复弹幕: ${user} - ${content}`);
       return true;
     }
   }
-  
+
   // 记录这条弹幕
   recentDanmakus.set(hash, now);
   console.log(`✅ 弹幕不重复，已记录: ${hash}`);
-  
+
   // 清理超过30秒的老记录，防止内存无限增长
   if (recentDanmakus.size > 100) {
     const expireTime = now - 30000; // 30秒前
@@ -246,7 +258,7 @@ function isDuplicateDanmaku(user: string, content: string): boolean {
     }
     console.log(`🧹 清理了 ${cleanedCount} 条过期弹幕缓存`);
   }
-  
+
   return false;
 }
 
@@ -254,25 +266,31 @@ function isDuplicateDanmaku(user: string, content: string): boolean {
  * 添加弹幕到列表
  */
 function addDanmaku(user: string, content: string) {
-  console.log(`🎬 [房间${props.roomData.id}] addDanmaku 被调用: ${user} - ${content}`);
-  
+  console.log(
+    `🎬 [房间${props.roomData.id}] addDanmaku 被调用: ${user} - ${content}`
+  );
+
   // 简单去重检查
   if (isDuplicateDanmaku(user, content)) {
-    console.log(`🚫 [房间${props.roomData.id}] 跳过重复弹幕: ${user} - ${content}`);
+    console.log(
+      `🚫 [房间${props.roomData.id}] 跳过重复弹幕: ${user} - ${content}`
+    );
     return; // 跳过重复弹幕
   }
-  
+
   console.log(`✅ [房间${props.roomData.id}] 添加新弹幕: ${user} - ${content}`);
-  
+
   const timestamp = Date.now();
-  
+
   // 生成全局唯一的ID（使用房间ID + 时间戳 + 随机数）
   const uniqueId = `${props.roomData.id}_${timestamp}_${Math.random().toString(36).substr(2, 9)}`;
-  const id = parseInt(uniqueId.replace(/\D/g, '').substr(-10)) || timestamp;
+  const id = parseInt(uniqueId.replace(/\D/g, "").substr(-10)) || timestamp;
   const danmaku = { id, user, content };
-  
+
   internalRoomData.danmakus.push(danmaku);
-  console.log(`📝 [房间${props.roomData.id}] 弹幕已添加到列表，当前总数: ${internalRoomData.danmakus.length}`);
+  console.log(
+    `📝 [房间${props.roomData.id}] 弹幕已添加到列表，当前总数: ${internalRoomData.danmakus.length}`
+  );
 
   // 限制弹幕数量
   if (internalRoomData.danmakus.length > maxDanmakuLines.value) {
@@ -301,7 +319,7 @@ const loadRoom = async () => {
 
   try {
     const res = await douyinApi.queryRoom(roomId);
-    
+
     // 更新房间信息
     const updatedData = {
       roomTitle: res.roomTitle,
@@ -312,7 +330,7 @@ const loadRoom = async () => {
         SD1: res.roomInfoJsonNode.web_stream_url.hls_pull_url_map.SD1,
         SD2: res.roomInfoJsonNode.web_stream_url.hls_pull_url_map.SD2,
       },
-      isLoaded: true
+      isLoaded: true,
     };
 
     Object.assign(internalRoomData, updatedData);
@@ -325,7 +343,7 @@ const loadRoom = async () => {
       },
       {} as Record<string, boolean>
     );
-    
+
     internalRoomData.recordingStatus = recordingStatus;
     recordingStartTimeMap.value = {};
     recordingDurationMap.value = {};
@@ -353,7 +371,7 @@ const modifyRoom = async () => {
     roomStatus: "",
     streamUrls: {},
     recordingStatus: {},
-    danmakus: []
+    danmakus: [],
   };
 
   Object.assign(internalRoomData, resetData);
@@ -378,11 +396,16 @@ const startMonitor = async () => {
     subscribe(`/topic/room/${internalRoomData.roomInput.trim()}`, (msg) => {
       console.log(`🔥🔥🔥 [房间${props.roomData.id}] 收到WebSocket消息:`, msg);
       // 验证消息格式并添加弹幕
-      if (msg?.nickname && msg?.content && 
-          typeof msg.nickname === 'string' && 
-          typeof msg.content === 'string' && 
-          msg.content.trim() !== '') {
-        console.log(`🎯 [房间${props.roomData.id}] 准备添加弹幕: ${msg.nickname} - ${msg.content}`);
+      if (
+        msg?.nickname &&
+        msg?.content &&
+        typeof msg.nickname === "string" &&
+        typeof msg.content === "string" &&
+        msg.content.trim() !== ""
+      ) {
+        console.log(
+          `🎯 [房间${props.roomData.id}] 准备添加弹幕: ${msg.nickname} - ${msg.content}`
+        );
         addDanmaku(msg.nickname.trim(), msg.content.trim());
       } else {
         console.warn(`❌ [房间${props.roomData.id}] 消息格式不正确:`, msg);
@@ -406,10 +429,10 @@ const startMonitor = async () => {
  */
 const stopMonitor = () => {
   if (!internalRoomData.isMonitoring) return;
-  
+
   douyinApi.disconnectRoom(internalRoomData.roomInput.trim());
   disconnect();
-  
+
   internalRoomData.isMonitoring = false;
   emit("monitoring-changed", props.roomData.id, false);
   updateRoomData({ isMonitoring: false });
@@ -433,7 +456,9 @@ const startRecord = async (quality: string) => {
     recordingStartTimeMap.value[quality] = Date.now();
     recordingDurationMap.value[quality] = "00:00:00";
     startRecordingTimer();
-    updateRoomData({ recordingStatus: { ...internalRoomData.recordingStatus } });
+    updateRoomData({
+      recordingStatus: { ...internalRoomData.recordingStatus },
+    });
     ElMessage.success(`${quality} 开始录制`);
   } catch (e) {
     ElMessage.error(`${quality} 录制失败`);
@@ -441,7 +466,6 @@ const startRecord = async (quality: string) => {
     loading.value = false;
   }
 };
-
 
 /**
  * 停止录制
@@ -477,7 +501,9 @@ const stopRecord = async (quality: string) => {
       stopRecordingTimer();
     }
 
-    updateRoomData({ recordingStatus: { ...internalRoomData.recordingStatus } });
+    updateRoomData({
+      recordingStatus: { ...internalRoomData.recordingStatus },
+    });
     ElMessage.success(`${quality} 已下载`);
   } catch (e) {
     ElMessage.error(`${quality} 停止失败`);
@@ -811,10 +837,10 @@ const updateRoomData = (data: Partial<LiveRoomData>) => {
 onMounted(() => {
   loadPlatformUsers();
   startStatusPolling();
-  
+
   // 监听批量操作事件
-  window.addEventListener('batchOperation', handleBatchOperation);
-  
+  window.addEventListener("batchOperation", handleBatchOperation);
+
   // 如果房间已加载，自动加载房间信息
   if (internalRoomData.roomInput && !internalRoomData.isLoaded) {
     loadRoom();
@@ -824,15 +850,15 @@ onMounted(() => {
 onUnmounted(() => {
   stopStatusPolling();
   stopRecordingTimer();
-  
+
   // 移除批量操作事件监听
-  window.removeEventListener('batchOperation', handleBatchOperation);
-  
+  window.removeEventListener("batchOperation", handleBatchOperation);
+
   // 如果正在监听，停止监听
   if (internalRoomData.isMonitoring) {
     stopMonitor();
   }
-  
+
   // 清理弹幕去重缓存
   recentDanmakus.clear();
 });
@@ -858,7 +884,7 @@ onUnmounted(() => {
     width: 100%;
     margin-bottom: 16px;
   }
-  
+
   .live-room-panel :deep(.el-col-16) {
     width: 100%;
   }

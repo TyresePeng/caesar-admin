@@ -11,17 +11,17 @@
           <el-button type="primary" icon="Plus" @click="addNewRoom">
             添加直播间
           </el-button>
-          <el-button 
-            type="success" 
-            icon="VideoPlay" 
+          <el-button
+            type="success"
+            icon="VideoPlay"
             :disabled="!hasActiveRooms"
             @click="batchStartMonitor"
           >
             批量开启监听
           </el-button>
-          <el-button 
-            type="warning" 
-            icon="VideoPause" 
+          <el-button
+            type="warning"
+            icon="VideoPause"
             :disabled="!hasActiveRooms"
             @click="batchStopMonitor"
           >
@@ -73,7 +73,7 @@
               </el-tag>
             </span>
           </template>
-          
+
           <!-- 单个直播间控制面板 -->
           <LiveRoomPanel
             :room-data="room"
@@ -82,7 +82,7 @@
             @danmaku-received="onDanmakuReceived"
           />
         </el-tab-pane>
-        
+
         <!-- 添加直播间的空状态 -->
         <el-empty
           v-if="rooms.length === 0"
@@ -109,7 +109,9 @@
       <p>{{ batchOperation.message }}</p>
       <template #footer>
         <el-button @click="batchOperationDialogVisible = false">取消</el-button>
-        <el-button type="primary" @click="confirmBatchOperation">确认</el-button>
+        <el-button type="primary" @click="confirmBatchOperation"
+          >确认</el-button
+        >
       </template>
     </el-dialog>
   </div>
@@ -146,12 +148,14 @@ const batchOperationDialogVisible = ref(false);
 const batchOperation = ref({
   title: "",
   message: "",
-  action: "" as "start" | "stop"
+  action: "" as "start" | "stop",
 });
 
 // ========== 计算属性 ==========
-const activeRooms = computed(() => rooms.value.filter(room => room.isLoaded));
-const monitoringRooms = computed(() => rooms.value.filter(room => room.isMonitoring));
+const activeRooms = computed(() => rooms.value.filter((room) => room.isLoaded));
+const monitoringRooms = computed(() =>
+  rooms.value.filter((room) => room.isMonitoring)
+);
 const hasActiveRooms = computed(() => activeRooms.value.length > 0);
 
 // ========== 直播间管理方法 ==========
@@ -182,7 +186,7 @@ const createRoom = (roomInput: string, displayName: string): LiveRoom => {
     aiDanmuEnabled: false,
     recordingStatus: {},
     createTime: Date.now(),
-    lastActiveTime: Date.now()
+    lastActiveTime: Date.now(),
   };
 };
 
@@ -201,7 +205,7 @@ const onRoomAdded = (roomData: { roomInput: string; displayName: string }) => {
  * 移除直播间
  */
 const removeRoom = async (roomId: string) => {
-  const room = rooms.value.find(r => r.id === roomId);
+  const room = rooms.value.find((r) => r.id === roomId);
   if (!room) return;
 
   // 如果正在监听，先确认停止
@@ -218,10 +222,10 @@ const removeRoom = async (roomId: string) => {
   }
 
   // 移除房间
-  const index = rooms.value.findIndex(r => r.id === roomId);
+  const index = rooms.value.findIndex((r) => r.id === roomId);
   if (index > -1) {
     rooms.value.splice(index, 1);
-    
+
     // 如果移除的是当前标签页，切换到其他标签页
     if (activeTab.value === roomId) {
       if (rooms.value.length > 0) {
@@ -231,7 +235,7 @@ const removeRoom = async (roomId: string) => {
         activeTab.value = "";
       }
     }
-    
+
     saveToLocalStorage();
     ElMessage.success(`直播间 "${room.displayName}" 已移除`);
   }
@@ -241,7 +245,7 @@ const removeRoom = async (roomId: string) => {
  * 标签页切换处理
  */
 const onTabChange = (tabName: string) => {
-  const room = rooms.value.find(r => r.id === tabName);
+  const room = rooms.value.find((r) => r.id === tabName);
   if (room) {
     room.unreadCount = 0; // 清除未读消息数
     room.lastActiveTime = Date.now();
@@ -256,7 +260,7 @@ const onTabChange = (tabName: string) => {
  * 处理直播间数据更新
  */
 const onRoomUpdated = (roomId: string, updateData: Partial<LiveRoom>) => {
-  const room = rooms.value.find(r => r.id === roomId);
+  const room = rooms.value.find((r) => r.id === roomId);
   if (room) {
     Object.assign(room, updateData);
     room.lastActiveTime = Date.now();
@@ -268,7 +272,7 @@ const onRoomUpdated = (roomId: string, updateData: Partial<LiveRoom>) => {
  * 处理监听状态变化
  */
 const onMonitoringChanged = (roomId: string, isMonitoring: boolean) => {
-  const room = rooms.value.find(r => r.id === roomId);
+  const room = rooms.value.find((r) => r.id === roomId);
   if (room) {
     room.isMonitoring = isMonitoring;
     room.lastActiveTime = Date.now();
@@ -279,16 +283,19 @@ const onMonitoringChanged = (roomId: string, isMonitoring: boolean) => {
 /**
  * 处理收到弹幕
  */
-const onDanmakuReceived = (roomId: string, danmaku: { id: number; user: string; content: string }) => {
-  const room = rooms.value.find(r => r.id === roomId);
+const onDanmakuReceived = (
+  roomId: string,
+  danmaku: { id: number; user: string; content: string }
+) => {
+  const room = rooms.value.find((r) => r.id === roomId);
   if (room) {
     room.danmakus.push(danmaku);
-    
+
     // 如果不是当前活跃标签页，增加未读计数
     if (activeTab.value !== roomId) {
       room.unreadCount++;
     }
-    
+
     room.lastActiveTime = Date.now();
     // 弹幕数据不需要保存到localStorage
     // saveToLocalStorage();
@@ -301,7 +308,7 @@ const onDanmakuReceived = (roomId: string, danmaku: { id: number; user: string; 
  * 批量开启监听
  */
 const batchStartMonitor = () => {
-  const availableRooms = activeRooms.value.filter(room => !room.isMonitoring);
+  const availableRooms = activeRooms.value.filter((room) => !room.isMonitoring);
   if (availableRooms.length === 0) {
     ElMessage.warning("没有可以开启监听的直播间");
     return;
@@ -310,7 +317,7 @@ const batchStartMonitor = () => {
   batchOperation.value = {
     title: "批量开启监听",
     message: `确定要为 ${availableRooms.length} 个直播间开启监听吗？`,
-    action: "start"
+    action: "start",
   };
   batchOperationDialogVisible.value = true;
 };
@@ -319,7 +326,7 @@ const batchStartMonitor = () => {
  * 批量停止监听
  */
 const batchStopMonitor = () => {
-  const monitoringRooms = rooms.value.filter(room => room.isMonitoring);
+  const monitoringRooms = rooms.value.filter((room) => room.isMonitoring);
   if (monitoringRooms.length === 0) {
     ElMessage.warning("没有正在监听的直播间");
     return;
@@ -328,7 +335,7 @@ const batchStopMonitor = () => {
   batchOperation.value = {
     title: "批量停止监听",
     message: `确定要为 ${monitoringRooms.length} 个直播间停止监听吗？`,
-    action: "stop"
+    action: "stop",
   };
   batchOperationDialogVisible.value = true;
 };
@@ -338,14 +345,16 @@ const batchStopMonitor = () => {
  */
 const confirmBatchOperation = () => {
   batchOperationDialogVisible.value = false;
-  
+
   // 这里将通过事件通知各个房间执行相应操作
-  const event = new CustomEvent('batchOperation', {
-    detail: { action: batchOperation.value.action }
+  const event = new CustomEvent("batchOperation", {
+    detail: { action: batchOperation.value.action },
   });
   window.dispatchEvent(event);
-  
-  ElMessage.success(`批量${batchOperation.value.action === 'start' ? '开启' : '停止'}监听操作已执行`);
+
+  ElMessage.success(
+    `批量${batchOperation.value.action === "start" ? "开启" : "停止"}监听操作已执行`
+  );
 };
 
 // ========== 数据持久化方法 ==========
@@ -356,21 +365,21 @@ const confirmBatchOperation = () => {
 const saveToLocalStorage = () => {
   try {
     // 保存房间配置时排除弹幕数据
-    const roomsToSave = rooms.value.map(room => ({
+    const roomsToSave = rooms.value.map((room) => ({
       ...room,
       danmakus: [], // 不保存弹幕数据
       unreadCount: 0, // 不保存未读计数
-      isMonitoring: false // 不保存监听状态
+      isMonitoring: false, // 不保存监听状态
     }));
-    
+
     const dataToSave = {
       rooms: roomsToSave,
       activeTab: activeTab.value,
-      timestamp: Date.now()
+      timestamp: Date.now(),
     };
-    localStorage.setItem('multi-live-rooms-data', JSON.stringify(dataToSave));
+    localStorage.setItem("multi-live-rooms-data", JSON.stringify(dataToSave));
   } catch (error) {
-    console.error('保存到本地存储失败:', error);
+    console.error("保存到本地存储失败:", error);
   }
 };
 
@@ -379,7 +388,7 @@ const saveToLocalStorage = () => {
  */
 const loadFromLocalStorage = () => {
   try {
-    const savedData = localStorage.getItem('multi-live-rooms-data');
+    const savedData = localStorage.getItem("multi-live-rooms-data");
     if (savedData) {
       const data = JSON.parse(savedData);
       // 只恢复基本信息，不恢复连接状态
@@ -389,8 +398,11 @@ const loadFromLocalStorage = () => {
           isMonitoring: false, // 重启时清除监听状态
           unreadCount: 0, // 清除未读计数
         }));
-        
-        if (data.activeTab && rooms.value.find(r => r.id === data.activeTab)) {
+
+        if (
+          data.activeTab &&
+          rooms.value.find((r) => r.id === data.activeTab)
+        ) {
           activeTab.value = data.activeTab;
         } else if (rooms.value.length > 0) {
           activeTab.value = rooms.value[0].id;
@@ -398,7 +410,7 @@ const loadFromLocalStorage = () => {
       }
     }
   } catch (error) {
-    console.error('从本地存储加载失败:', error);
+    console.error("从本地存储加载失败:", error);
   }
 };
 
@@ -413,7 +425,7 @@ onUnmounted(() => {
 });
 
 // 页面刷新前保存数据
-window.addEventListener('beforeunload', saveToLocalStorage);
+window.addEventListener("beforeunload", saveToLocalStorage);
 </script>
 
 <style scoped>
@@ -469,16 +481,16 @@ window.addEventListener('beforeunload', saveToLocalStorage);
   .multi-live-rooms {
     padding: 12px;
   }
-  
+
   .operation-bar {
     flex-direction: column;
     align-items: stretch;
   }
-  
+
   .left-actions {
     justify-content: center;
   }
-  
+
   .right-info {
     justify-content: center;
   }
