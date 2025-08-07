@@ -1,9 +1,9 @@
 <!--
-  直播间控制台主页面
-  功能：整合各个子组件，提供直播间监控、AI弹幕管理、录制等完整功能
+  单个直播间控制面板组件
+  功能：封装单个直播间的所有功能，复用现有live-room组件
 -->
 <template>
-  <div class="app-container live-monitor" v-loading="loading">
+  <div class="live-room-panel" v-loading="loading">
     <!-- 直播间控制区 + 状态展示区 -->
     <el-card shadow="never">
       <el-row :gutter="20" align="top">
@@ -11,10 +11,11 @@
         <el-col :span="8">
           <!-- 房间控制组件 -->
           <RoomControl
-            v-model:room-input="roomInput"
-            :is-room-loaded="isRoomLoaded"
-            :is-monitoring="isMonitoring"
+            v-model:room-input="internalRoomData.roomInput"
+            :is-room-loaded="internalRoomData.isLoaded"
+            :is-monitoring="internalRoomData.isMonitoring"
             :loading="loading"
+            :readonly="true"
             @load-room="loadRoom"
             @modify-room="modifyRoom"
             @start-monitor="startMonitor"
@@ -23,22 +24,22 @@
 
           <!-- 直播统计面板组件 -->
           <LiveStatsPanel
-            :room-status="roomStatus"
-            :danmaku-count="danmakus.length"
-            :stream-urls="streamUrls"
-            :is-recording-map="isRecordingMap"
+            :room-status="internalRoomData.roomStatus"
+            :danmaku-count="internalRoomData.danmakus.length"
+            :stream-urls="internalRoomData.streamUrls"
+            :is-recording-map="internalRoomData.recordingStatus"
           />
         </el-col>
 
         <!-- 右侧：直播信息展示 -->
         <el-col :span="16">
           <LiveInfoPanel
-            :room-title="roomTitle"
-            :room-status="roomStatus"
-            :stream-urls="streamUrls"
+            :room-title="internalRoomData.roomTitle"
+            :room-status="internalRoomData.roomStatus"
+            :stream-urls="internalRoomData.streamUrls"
             v-model:selected-quality="selectedQuality"
             v-model:show-preview="showPreview"
-            :is-recording-map="isRecordingMap"
+            :is-recording-map="internalRoomData.recordingStatus"
             :recording-duration-map="recordingDurationMap"
             @quality-change="onQualityChange"
             @preview-toggle="onPreviewToggle"
@@ -54,7 +55,7 @@
     <!-- AI弹幕管理区域 -->
     <AiDanmuManager
       v-model:collapsed="aiDanmuCollapsed"
-      :is-room-loaded="isRoomLoaded"
+      :is-room-loaded="internalRoomData.isLoaded"
       :platform-users="platformUsers"
       :ai-status-map="aiStatusMap"
       :starting-users="startingUsers"
@@ -72,7 +73,7 @@
       v-model:collapsed="danmakuCollapsed"
       v-model:max-lines="maxDanmakuLines"
       v-model:input-text="myDanmaku"
-      :danmakus="danmakus"
+      :danmakus="internalRoomData.danmakus"
       :sending="loading"
       @clear-danmakus="clearDanmakus"
       @send-danmaku="sendMyDanmaku"
@@ -81,7 +82,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, nextTick, onMounted, onUnmounted } from "vue";
+import { ref, reactive, watch, onMounted, onUnmounted } from "vue";
 import { ElMessage, ElMessageBox } from "element-plus";
 import douyinApi from "@/api/douyin";
 import platformApi from "@/api/platform";
@@ -90,34 +91,53 @@ import AiDanmuApi, {
   type AiDanmuStatus,
 } from "@/api/ai-danmu";
 import { useStompClient } from "@/api/useStompClient";
-import { useLeaveConfirm } from "@/utils/useLeaveConfirm";
-import RoomControl from "./components/RoomControl.vue";
-import LiveStatsPanel from "./components/LiveStatsPanel.vue";
-import LiveInfoPanel from "./components/LiveInfoPanel.vue";
-import AiDanmuManager from "./components/AiDanmuManager.vue";
-import DanmakuDisplay from "./components/DanmakuDisplay.vue";
+import RoomControl from "@/views/live-room/components/RoomControl.vue";
+import LiveStatsPanel from "@/views/live-room/components/LiveStatsPanel.vue";
+import LiveInfoPanel from "@/views/live-room/components/LiveInfoPanel.vue";
+import AiDanmuManager from "@/views/live-room/components/AiDanmuManager.vue";
+import DanmakuDisplay from "@/views/live-room/components/DanmakuDisplay.vue";
 
-// ========== 基础状态管理 ==========
+interface LiveRoomData {
+  id: string;
+  roomInput: string;
+  displayName: string;
+  roomTitle: string;
+  roomStatus: string;
+  isLoaded: boolean;
+  isMonitoring: boolean;
+  unreadCount: number;
+  streamUrls: Record<string, string>;
+  danmakus: Array<{ id: number; user: string; content: string }>;
+  aiDanmuEnabled: boolean;
+  recordingStatus: Record<string, boolean>;
+  createTime: number;
+  lastActiveTime: number;
+}
+
+const props = defineProps<{
+  roomData: LiveRoomData;
+}>();
+
+const emit = defineEmits<{
+  "room-updated": [roomId: string, data: Partial<LiveRoomData>];
+  "monitoring-changed": [roomId: string, isMonitoring: boolean];
+  "danmaku-received": [roomId: string, danmaku: { id: number; user: string; content: string }];
+}>();
+
+// ========== 内部状态管理 ==========
 const loading = ref(false);
-const roomInput = ref("");
-const roomDescription = ref("");
-const isRoomLoaded = ref(false);
-const isMonitoring = ref(false);
-const roomTitle = ref("");
-const roomStatus = ref("");
+const internalRoomData = reactive({ ...props.roomData });
 
 // ========== 流媒体和录制状态 ==========
-const streamUrls = ref<Record<string, string>>({});
-const isRecordingMap = ref<Record<string, boolean>>({});
 const recordingStartTimeMap = ref<Record<string, number>>({});
 const recordingDurationMap = ref<Record<string, string>>({});
 const selectedQuality = ref("");
 
 // ========== 弹幕相关状态 ==========
-const danmakus = ref<{ id: number; user: string; content: string }[]>([]);
 const myDanmaku = ref("");
 const maxDanmakuLines = ref(50);
-let idCounter = 0;
+// 简单的弹幕去重缓存 - 存储最近的弹幕内容和时间
+const recentDanmakus = new Map<string, number>(); // hash -> timestamp
 
 // ========== 视频预览相关状态 ==========
 const showPreview = ref(false);
@@ -136,11 +156,29 @@ const stoppingUsers = ref<number[]>([]);
 let statusPollingTimer: number | null = null;
 let recordingTimerInterval: number | null = null;
 
-// ========== WebSocket连接 ==========
+// ========== WebSocket连接管理 ==========
 const serviceUrl = import.meta.env.VITE_APP_API_URL;
 const { connect, subscribe, disconnect } = useStompClient(`${serviceUrl}/ws`, {
-  onDisconnect: () => (isMonitoring.value = false),
+  onDisconnect: () => {
+    internalRoomData.isMonitoring = false;
+    emit("monitoring-changed", props.roomData.id, false);
+  },
 });
+
+// ========== 监听 props 变化 ==========
+watch(() => props.roomData, (newData) => {
+  Object.assign(internalRoomData, newData);
+}, { deep: true });
+
+// ========== 监听批量操作事件 ==========
+const handleBatchOperation = (event: CustomEvent) => {
+  const { action } = event.detail;
+  if (action === 'start' && internalRoomData.isLoaded && !internalRoomData.isMonitoring) {
+    startMonitor();
+  } else if (action === 'stop' && internalRoomData.isMonitoring) {
+    stopMonitor();
+  }
+};
 
 // ========== 弹幕相关方法 ==========
 
@@ -148,7 +186,10 @@ const { connect, subscribe, disconnect } = useStompClient(`${serviceUrl}/ws`, {
  * 清空弹幕列表
  */
 const clearDanmakus = () => {
-  danmakus.value = [];
+  internalRoomData.danmakus.splice(0);
+  recentDanmakus.clear(); // 同时清空去重缓存
+  // 清空弹幕不需要持久化保存
+  // updateRoomData({ danmakus: [] });
 };
 
 /**
@@ -159,7 +200,7 @@ function sendMyDanmaku() {
   try {
     const content = myDanmaku.value.trim();
     if (!content) return;
-    douyinApi.sendMsg(roomInput.value, "", content);
+    douyinApi.sendMsg(internalRoomData.roomInput, "", content);
     addDanmaku("我自己", content);
     myDanmaku.value = "";
   } catch (error) {
@@ -170,16 +211,78 @@ function sendMyDanmaku() {
 }
 
 /**
+ * 检查弹幕是否重复
+ */
+function isDuplicateDanmaku(user: string, content: string): boolean {
+  const now = Date.now();
+  const hash = `${user.trim()}_${content.trim()}`;
+  
+  console.log(`🔍 检查重复弹幕: ${hash}, 缓存大小: ${recentDanmakus.size}`);
+  
+  // 检查是否在最近3秒内有相同的弹幕
+  if (recentDanmakus.has(hash)) {
+    const lastTime = recentDanmakus.get(hash)!;
+    const timeDiff = now - lastTime;
+    console.log(`⏰ 发现缓存弹幕，时间差: ${timeDiff}ms`);
+    if (timeDiff < 3000) { // 3秒内的重复弹幕过滤
+      console.log(`🚫 过滤3秒内重复弹幕: ${user} - ${content}`);
+      return true;
+    }
+  }
+  
+  // 记录这条弹幕
+  recentDanmakus.set(hash, now);
+  console.log(`✅ 弹幕不重复，已记录: ${hash}`);
+  
+  // 清理超过30秒的老记录，防止内存无限增长
+  if (recentDanmakus.size > 100) {
+    const expireTime = now - 30000; // 30秒前
+    let cleanedCount = 0;
+    for (const [key, timestamp] of recentDanmakus.entries()) {
+      if (timestamp < expireTime) {
+        recentDanmakus.delete(key);
+        cleanedCount++;
+      }
+    }
+    console.log(`🧹 清理了 ${cleanedCount} 条过期弹幕缓存`);
+  }
+  
+  return false;
+}
+
+/**
  * 添加弹幕到列表
  */
 function addDanmaku(user: string, content: string) {
-  const id = idCounter++;
-  danmakus.value.push({ id, user, content });
-
-  // 限制弹幕数量，保留最新的弹幕，旧弹幕会被新弹幕挤掉
-  if (danmakus.value.length > maxDanmakuLines.value) {
-    danmakus.value.splice(0, danmakus.value.length - maxDanmakuLines.value);
+  console.log(`🎬 [房间${props.roomData.id}] addDanmaku 被调用: ${user} - ${content}`);
+  
+  // 简单去重检查
+  if (isDuplicateDanmaku(user, content)) {
+    console.log(`🚫 [房间${props.roomData.id}] 跳过重复弹幕: ${user} - ${content}`);
+    return; // 跳过重复弹幕
   }
+  
+  console.log(`✅ [房间${props.roomData.id}] 添加新弹幕: ${user} - ${content}`);
+  
+  const timestamp = Date.now();
+  
+  // 生成全局唯一的ID（使用房间ID + 时间戳 + 随机数）
+  const uniqueId = `${props.roomData.id}_${timestamp}_${Math.random().toString(36).substr(2, 9)}`;
+  const id = parseInt(uniqueId.replace(/\D/g, '').substr(-10)) || timestamp;
+  const danmaku = { id, user, content };
+  
+  internalRoomData.danmakus.push(danmaku);
+  console.log(`📝 [房间${props.roomData.id}] 弹幕已添加到列表，当前总数: ${internalRoomData.danmakus.length}`);
+
+  // 限制弹幕数量
+  if (internalRoomData.danmakus.length > maxDanmakuLines.value) {
+    const removed = internalRoomData.danmakus.shift(); // 移除最旧的弹幕
+    console.log(`🗑️ [房间${props.roomData.id}] 移除旧弹幕:`, removed);
+  }
+
+  // 通知父组件收到新弹幕
+  emit("danmaku-received", props.roomData.id, danmaku);
+  console.log(`📢 [房间${props.roomData.id}] 已通知父组件弹幕接收事件`);
 }
 
 // ========== 直播间相关方法 ==========
@@ -189,7 +292,7 @@ function addDanmaku(user: string, content: string) {
  */
 const loadRoom = async () => {
   loading.value = true;
-  const roomId = roomInput.value.trim();
+  const roomId = internalRoomData.roomInput.trim();
   if (!roomId) {
     ElMessage.warning("请输入直播间地址或ID");
     loading.value = false;
@@ -198,31 +301,36 @@ const loadRoom = async () => {
 
   try {
     const res = await douyinApi.queryRoom(roomId);
-    roomTitle.value = res.roomTitle;
-    // 使用 roomLiveStatus 字段，这个字段更准确
-    roomStatus.value = res.roomLiveStatus || res.roomStatus;
-
-    // 解析流地址
-    const hls = res.roomInfoJsonNode.web_stream_url.hls_pull_url_map;
-    streamUrls.value = {
-      FULL_HD1: hls.FULL_HD1,
-      HD1: hls.HD1,
-      SD1: hls.SD1,
-      SD2: hls.SD2,
+    
+    // 更新房间信息
+    const updatedData = {
+      roomTitle: res.roomTitle,
+      roomStatus: res.roomLiveStatus || res.roomStatus,
+      streamUrls: {
+        FULL_HD1: res.roomInfoJsonNode.web_stream_url.hls_pull_url_map.FULL_HD1,
+        HD1: res.roomInfoJsonNode.web_stream_url.hls_pull_url_map.HD1,
+        SD1: res.roomInfoJsonNode.web_stream_url.hls_pull_url_map.SD1,
+        SD2: res.roomInfoJsonNode.web_stream_url.hls_pull_url_map.SD2,
+      },
+      isLoaded: true
     };
 
+    Object.assign(internalRoomData, updatedData);
+
     // 初始化录制状态
-    isRecordingMap.value = Object.keys(streamUrls.value).reduce(
+    const recordingStatus = Object.keys(internalRoomData.streamUrls).reduce(
       (acc, key) => {
         acc[key] = false;
         return acc;
       },
       {} as Record<string, boolean>
     );
+    
+    internalRoomData.recordingStatus = recordingStatus;
     recordingStartTimeMap.value = {};
     recordingDurationMap.value = {};
 
-    isRoomLoaded.value = true;
+    updateRoomData(updatedData);
     ElMessage.success("直播间加载成功");
   } catch (err) {
     ElMessage.error("加载失败");
@@ -235,31 +343,27 @@ const loadRoom = async () => {
  * 修改直播间 - 重置所有状态
  */
 const modifyRoom = async () => {
-  console.log("🔄 修改直播间 - 重置所有状态");
-
   // 停止监听
-  if (isMonitoring.value) stopMonitor();
+  if (internalRoomData.isMonitoring) stopMonitor();
 
-  // 重置直播间状态
-  isRoomLoaded.value = false;
-  roomTitle.value = "";
-  roomStatus.value = "";
-  roomDescription.value = "";
+  // 重置状态
+  const resetData = {
+    isLoaded: false,
+    roomTitle: "",
+    roomStatus: "",
+    streamUrls: {},
+    recordingStatus: {},
+    danmakus: []
+  };
 
-  // 清空流地址和录制状态
-  streamUrls.value = {};
-  isRecordingMap.value = {};
+  Object.assign(internalRoomData, resetData);
   recordingStartTimeMap.value = {};
   recordingDurationMap.value = {};
   selectedQuality.value = "";
-
-  // 重置视频预览状态
   showPreview.value = false;
+  recentDanmakus.clear(); // 清理弹幕去重缓存
 
-  // 清空弹幕
-  clearDanmakus();
-
-  console.log("✅ 直播间状态已重置");
+  updateRoomData(resetData);
   ElMessage.info("直播间修改已启用，请重新输入直播间地址");
 };
 
@@ -267,19 +371,30 @@ const modifyRoom = async () => {
  * 开始监听弹幕
  */
 const startMonitor = async () => {
-  if (!isRoomLoaded.value) return;
+  if (!internalRoomData.isLoaded) return;
   loading.value = true;
   try {
     await connect();
-    subscribe(`/topic/room/${roomInput.value.trim()}`, (msg) => {
-      if (msg?.nickname && msg?.content) {
-        addDanmaku(msg.nickname, msg.content);
+    subscribe(`/topic/room/${internalRoomData.roomInput.trim()}`, (msg) => {
+      console.log(`🔥🔥🔥 [房间${props.roomData.id}] 收到WebSocket消息:`, msg);
+      // 验证消息格式并添加弹幕
+      if (msg?.nickname && msg?.content && 
+          typeof msg.nickname === 'string' && 
+          typeof msg.content === 'string' && 
+          msg.content.trim() !== '') {
+        console.log(`🎯 [房间${props.roomData.id}] 准备添加弹幕: ${msg.nickname} - ${msg.content}`);
+        addDanmaku(msg.nickname.trim(), msg.content.trim());
+      } else {
+        console.warn(`❌ [房间${props.roomData.id}] 消息格式不正确:`, msg);
       }
     });
-    await douyinApi.connectRoom(roomInput.value.trim());
-    isMonitoring.value = true;
+    await douyinApi.connectRoom(internalRoomData.roomInput.trim());
+    internalRoomData.isMonitoring = true;
+    emit("monitoring-changed", props.roomData.id, true);
+    updateRoomData({ isMonitoring: true });
     ElMessage.success("开始监听弹幕");
   } catch (err) {
+    console.error(`❌ [房间${props.roomData.id}] 监听失败:`, err);
     ElMessage.error("监听失败");
   } finally {
     loading.value = false;
@@ -290,10 +405,14 @@ const startMonitor = async () => {
  * 停止监听弹幕
  */
 const stopMonitor = () => {
-  if (!isMonitoring.value) return;
-  douyinApi.disconnectRoom(roomInput.value.trim());
+  if (!internalRoomData.isMonitoring) return;
+  
+  douyinApi.disconnectRoom(internalRoomData.roomInput.trim());
   disconnect();
-  isMonitoring.value = false;
+  
+  internalRoomData.isMonitoring = false;
+  emit("monitoring-changed", props.roomData.id, false);
+  updateRoomData({ isMonitoring: false });
   ElMessage.info("已停止监听弹幕");
 };
 
@@ -303,17 +422,18 @@ const stopMonitor = () => {
  * 开始录制
  */
 const startRecord = async (quality: string) => {
-  const roomId = roomInput.value;
-  const url = streamUrls.value[quality];
+  const roomId = internalRoomData.roomInput;
+  const url = internalRoomData.streamUrls[quality];
   if (!url) return;
 
   loading.value = true;
   try {
     await douyinApi.liveRecord(roomId, url, quality);
-    isRecordingMap.value[quality] = true;
+    internalRoomData.recordingStatus[quality] = true;
     recordingStartTimeMap.value[quality] = Date.now();
     recordingDurationMap.value[quality] = "00:00:00";
     startRecordingTimer();
+    updateRoomData({ recordingStatus: { ...internalRoomData.recordingStatus } });
     ElMessage.success(`${quality} 开始录制`);
   } catch (e) {
     ElMessage.error(`${quality} 录制失败`);
@@ -327,8 +447,8 @@ const startRecord = async (quality: string) => {
  * 停止录制
  */
 const stopRecord = async (quality: string) => {
-  const roomId = roomInput.value;
-  const url = streamUrls.value[quality];
+  const roomId = internalRoomData.roomInput;
+  const url = internalRoomData.streamUrls[quality];
   if (!url) return;
 
   loading.value = true;
@@ -345,18 +465,19 @@ const stopRecord = async (quality: string) => {
     a.remove();
 
     // 更新状态
-    isRecordingMap.value[quality] = false;
+    internalRoomData.recordingStatus[quality] = false;
     delete recordingStartTimeMap.value[quality];
     delete recordingDurationMap.value[quality];
 
     // 检查是否需要停止定时器
-    const hasRecording = Object.values(isRecordingMap.value).some(
+    const hasRecording = Object.values(internalRoomData.recordingStatus).some(
       (recording) => recording
     );
     if (!hasRecording) {
       stopRecordingTimer();
     }
 
+    updateRoomData({ recordingStatus: { ...internalRoomData.recordingStatus } });
     ElMessage.success(`${quality} 已下载`);
   } catch (e) {
     ElMessage.error(`${quality} 停止失败`);
@@ -369,7 +490,7 @@ const stopRecord = async (quality: string) => {
  * 复制流地址
  */
 const copyStreamUrl = () => {
-  const url = streamUrls.value[selectedQuality.value];
+  const url = internalRoomData.streamUrls[selectedQuality.value];
   if (!url) {
     ElMessage.warning("请选择清晰度");
     return;
@@ -386,11 +507,7 @@ const copyStreamUrl = () => {
  * 质量选择变化处理
  */
 const onQualityChange = () => {
-  console.log("🎯 清晰度改变:", selectedQuality.value);
-
-  // 自动开启预览
   if (!showPreview.value) {
-    console.log("🔄 自动开启视频预览");
     showPreview.value = true;
   }
 };
@@ -399,14 +516,14 @@ const onQualityChange = () => {
  * 预览开关切换处理
  */
 const onPreviewToggle = (value: boolean) => {
-  console.log("📺 预览开关切换:", value);
+  // 处理预览切换
 };
 
 /**
  * 刷新视频
  */
 const refreshVideo = () => {
-  console.log("🔄 刷新视频");
+  // 刷新视频逻辑
 };
 
 // ========== 录制时间管理 ==========
@@ -428,7 +545,7 @@ const formatRecordingTime = (startTime: number): string => {
  */
 const updateRecordingTimes = () => {
   Object.keys(recordingStartTimeMap.value).forEach((quality) => {
-    if (isRecordingMap.value[quality]) {
+    if (internalRoomData.recordingStatus[quality]) {
       recordingDurationMap.value[quality] = formatRecordingTime(
         recordingStartTimeMap.value[quality]
       );
@@ -468,7 +585,6 @@ const loadPlatformUsers = async () => {
     });
     platformUsers.value = res.records || [];
 
-    // 初始化状态map
     platformUsers.value.forEach((user) => {
       if (!aiStatusMap.value[user.id]) {
         aiStatusMap.value[user.id] = {
@@ -491,8 +607,6 @@ const loadPlatformUsers = async () => {
  * 选择用户
  */
 const selectUser = (userId: number) => {
-  console.log("👤 选择用户:", userId);
-  // 获取该用户的最新状态
   refreshUserStatus(userId);
 };
 
@@ -500,12 +614,12 @@ const selectUser = (userId: number) => {
  * 启动单个用户AI弹幕
  */
 const startSingleAiDanmu = async (userId: number) => {
-  if (!isRoomLoaded.value) return;
+  if (!internalRoomData.isLoaded) return;
 
   try {
     startingUsers.value.push(userId);
 
-    const roomId = extractRoomId(roomInput.value);
+    const roomId = extractRoomId(internalRoomData.roomInput);
     if (!roomId) {
       ElMessage.error("请先加载有效的直播间");
       return;
@@ -514,7 +628,7 @@ const startSingleAiDanmu = async (userId: number) => {
     await AiDanmuApi.startAiDanmu({
       userId: userId,
       roomId: parseInt(roomId),
-      roomDescription: roomDescription.value,
+      roomDescription: "",
       randomSeconds: 3,
       aiPersonality: "专业销售顾问",
     });
@@ -550,7 +664,7 @@ const stopSingleAiDanmu = async (userId: number) => {
  * 批量启动AI弹幕
  */
 const batchStartAiDanmu = async (userIds: number[]) => {
-  if (userIds.length === 0 || !isRoomLoaded.value) return;
+  if (userIds.length === 0 || !internalRoomData.isLoaded) return;
 
   try {
     await ElMessageBox.confirm(
@@ -559,7 +673,7 @@ const batchStartAiDanmu = async (userIds: number[]) => {
       { type: "warning" }
     );
 
-    const roomId = extractRoomId(roomInput.value);
+    const roomId = extractRoomId(internalRoomData.roomInput);
     if (!roomId) {
       ElMessage.error("请先加载有效的直播间");
       return;
@@ -568,7 +682,7 @@ const batchStartAiDanmu = async (userIds: number[]) => {
     await AiDanmuApi.batchStart({
       userIds: userIds,
       roomId: parseInt(roomId),
-      roomDescription: roomDescription.value,
+      roomDescription: "",
       randomSeconds: 3,
       aiPersonality: "专业销售顾问",
     });
@@ -656,12 +770,10 @@ const refreshAllStatus = async () => {
 const extractRoomId = (input: string): string | null => {
   if (!input) return null;
 
-  // 如果是纯数字，直接返回
   if (/^\d+$/.test(input)) {
     return input;
   }
 
-  // 从抖音链接中提取房间ID
   const match = input.match(/live\.douyin\.com\/(\d+)/);
   return match ? match[1] : null;
 };
@@ -674,7 +786,7 @@ const startStatusPolling = () => {
 
   statusPollingTimer = window.setInterval(() => {
     refreshAllStatus();
-  }, 5000); // 每5秒轮询一次
+  }, 5000);
 };
 
 /**
@@ -687,36 +799,68 @@ const stopStatusPolling = () => {
   }
 };
 
+/**
+ * 更新房间数据
+ */
+const updateRoomData = (data: Partial<LiveRoomData>) => {
+  emit("room-updated", props.roomData.id, data);
+};
+
 // ========== 生命周期钩子 ==========
 
-// 组件挂载时初始化
 onMounted(() => {
   loadPlatformUsers();
   startStatusPolling();
+  
+  // 监听批量操作事件
+  window.addEventListener('batchOperation', handleBatchOperation);
+  
+  // 如果房间已加载，自动加载房间信息
+  if (internalRoomData.roomInput && !internalRoomData.isLoaded) {
+    loadRoom();
+  }
 });
 
-// 组件卸载时清理
 onUnmounted(() => {
   stopStatusPolling();
   stopRecordingTimer();
-});
-
-// ========== 离开确认 ==========
-useLeaveConfirm({
-  isMonitoring,
-  isRecording: ref(false),
-  stopMonitor,
-  message: "检测到您正在监听，确定要离开吗？",
+  
+  // 移除批量操作事件监听
+  window.removeEventListener('batchOperation', handleBatchOperation);
+  
+  // 如果正在监听，停止监听
+  if (internalRoomData.isMonitoring) {
+    stopMonitor();
+  }
+  
+  // 清理弹幕去重缓存
+  recentDanmakus.clear();
 });
 </script>
 
 <style scoped>
-.app-container {
-  padding: 20px;
+.live-room-panel {
+  padding: 0;
 }
 
-.live-monitor {
-  max-width: 1400px;
-  margin: 0 auto;
+/* 紧凑布局 */
+.live-room-panel :deep(.el-card) {
+  margin-bottom: 16px;
+}
+
+.live-room-panel :deep(.el-card:last-child) {
+  margin-bottom: 0;
+}
+
+/* 响应式调整 */
+@media (max-width: 1200px) {
+  .live-room-panel :deep(.el-col-8) {
+    width: 100%;
+    margin-bottom: 16px;
+  }
+  
+  .live-room-panel :deep(.el-col-16) {
+    width: 100%;
+  }
 }
 </style>
